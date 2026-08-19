@@ -1,39 +1,86 @@
-from langchain.text_splitter import CharacterTextSplitter
-from langchain.vectorstores import FAISS
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.llms import HuggingFaceHub
-from langchain.chains import RetrievalQA
+from langchain_ollama import OllamaLLM
+from app.vector_store import build_index, search
 
-# Sample knowledge (you can replace with PDF later)
-documents = [
-    "Artificial Intelligence is the simulation of human intelligence.",
-    "Machine Learning is a subset of AI that learns from data.",
-    "Python is widely used for AI and Data Science.",
-    "FastAPI is used to build APIs in Python."
-]
+pdf_text = ""
+pdf_chunks = []
 
-# Convert to chunks
-text_splitter = CharacterTextSplitter(chunk_size=200, chunk_overlap=20)
-texts = text_splitter.create_documents(documents)
-
-# Embeddings
-embeddings = HuggingFaceEmbeddings()
-
-# Vector DB
-db = FAISS.from_documents(texts, embeddings)
-
-# LLM (FREE)
-llm = HuggingFaceHub(
-    repo_id="google/flan-t5-base",
-    model_kwargs={"temperature": 0.5, "max_length": 256}
-)
-
-# QA chain
-qa_chain = RetrievalQA.from_chain_type(
-    llm=llm,
-    retriever=db.as_retriever()
-)
+llm = OllamaLLM(model="llama3.2:1b")
 
 
-def get_ai_answer(query: str):
-    return qa_chain.run(query)
+def set_pdf_text(text: str):
+    global pdf_text
+    pdf_text = text
+
+
+def split_into_chunks(text: str, chunk_size: int = 500):
+    words = text.split()
+    chunks = []
+
+    for i in range(0, len(words), chunk_size):
+        chunk = " ".join(words[i:i + chunk_size])
+        if chunk.strip():
+            chunks.append(chunk)
+
+    return chunks
+
+
+def index_pdf(text: str):
+    global pdf_text, pdf_chunks
+
+    pdf_text = text
+    pdf_chunks = split_into_chunks(text)
+
+    build_index(pdf_chunks)
+
+    return {
+        "message": "PDF indexed successfully",
+        "chunks": len(pdf_chunks)
+    }
+
+
+def generate_ai_answer(query: str, context: str):
+    prompt = f"""
+You are an AI assistant that answers questions from an uploaded PDF.
+
+Rules:
+- Answer ONLY using the PDF context.
+- Do not invent information.
+- Understand the meaning of the question.
+- Give a direct and clear answer.
+- If the answer is not present, say:
+"The answer is not available in the uploaded PDF."
+- If asked what the PDF is about, give a short summary.
+
+PDF CONTEXT:
+{context}
+
+USER QUESTION:
+{query}
+
+ANSWER:
+"""
+
+    try:
+        response = llm.invoke(prompt)
+
+        if not response:
+            return "The AI could not generate an answer."
+
+        return response.strip()
+
+    except Exception as e:
+        return f"AI answer generation failed: {str(e)}"
+
+
+def get_answer_from_pdf(query: str):
+    if not pdf_text.strip():
+        return "No PDF has been uploaded yet."
+
+    relevant_chunks = search(query, k=5)
+
+    if not relevant_chunks:
+        return "The answer is not available in the uploaded PDF."
+
+    context = "\n\n".join(relevant_chunks)
+
+    return generate_ai_answer(query, context)
