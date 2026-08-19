@@ -1,0 +1,9 @@
+/* Tailwind */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* your custom styles (optional) */
+body {
+  margin: 0;
+}

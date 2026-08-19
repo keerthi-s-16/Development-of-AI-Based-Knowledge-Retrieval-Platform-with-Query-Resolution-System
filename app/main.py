@@ -4,20 +4,26 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import auth_router
 from app.api.query import router as query_router
+from app.api.upload import router as upload_router
 from app.core.config import get_settings
 from app.database.connection import init_db
 
 
+# 🔥 Startup / Shutdown lifecycle
 @asynccontextmanager
-async def lifespan(_app: FastAPI):
-    """Application startup and shutdown events."""
+async def lifespan(app: FastAPI):
+    print("Starting application...")
 
-    # ✅ ENABLE THIS
+    # DB initialize
     await init_db()
+    print("Database initialized")
 
     yield
 
+    print("Shutting down application...")
 
+
+# 🔥 Create FastAPI app
 def create_app() -> FastAPI:
     settings = get_settings()
 
@@ -26,6 +32,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan
     )
 
+    # 🔥 CORS setup
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -34,9 +41,19 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # 🔥 Routers
     app.include_router(auth_router)
     app.include_router(query_router)
+    app.include_router(upload_router)   # ✅ IMPORTANT FIX
 
+    # 🔥 ROOT route
+    @app.get("/")
+    async def root():
+        return {
+            "message": "AI Query System is running 🚀"
+        }
+
+    # 🔥 Health check route
     @app.get("/health")
     async def health():
         return {"status": "ok"}
@@ -44,7 +61,5 @@ def create_app() -> FastAPI:
     return app
 
 
+# 🔥 App instance
 app = create_app()
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)

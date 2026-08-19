@@ -10,3 +10,14 @@ uploads/
 *.egg-info/
 dist/
 build/
+
+# Virtual environments
+venv/
+venv310/
+
+# Local database
+*.db
+
+# Temporary files
+temp.pdf
+temp.wav

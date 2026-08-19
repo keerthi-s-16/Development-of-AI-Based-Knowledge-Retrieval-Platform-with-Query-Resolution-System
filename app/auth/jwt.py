@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import  datetime, timedelta, timezone
 from typing import Any, Literal
 from uuid import UUID
 
@@ -67,7 +67,7 @@ class JWTService:
         token_type: TokenType,
         expires_delta: timedelta,
     ) -> str:
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         payload = {
             "sub": str(user_id),
             "email": email,
